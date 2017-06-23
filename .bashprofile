@@ -1,0 +1,63 @@
+# ROS
+source /opt/ros/noetic/setup.bash
+
+
+
+server() {
+ /home/bryce/scripts/server.sh;
+}
+
+# Recursively find files containing input in name.
+f() {
+  find -iname "*$1*" -type f;
+}
+
+src() {
+  source ~/.bashprofile
+}
+
+pushd () {
+    command pushd "$@" > /dev/null
+}
+
+popd () {
+    command popd "$@" > /dev/null
+}
+
+win() {
+  pushd .
+  cd /mnt/c/users/bae43/
+  ls
+}
+
+# Human readable top level disk usage of a folder.
+disk(){
+  du -h -d1 $1 | sort -n;
+}
+
+back(){
+  popd 
+}
+
+sshweb() {
+  # ssh root@143.110.153.237
+  ssh -t root@143.110.153.237 'cd /var/www/html/; bash'
+}
+upload() {
+  rcp -r $1 root@143.110.153.237:/var/www/html/$2;
+}
+
+gr() {
+  cd $(git root);
+}
+
+push() {
+  pushd . &> /dev/null;
+  bcd;
+  git add --a;
+  cmd="git commit -m \"$@\"";
+  echo $cmd; 
+  eval $cmd;
+  git push;
+  popd &> /dev/null;
+}
