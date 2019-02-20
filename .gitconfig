@@ -1,0 +1,28 @@
+[user]
+        email = bryce@domain.edu
+        name = Bryce Evans
+[push]
+        default = current
+[pull]
+        default = current
+[branch]
+        autoSetupPull = always
+        autoSetupPush = always
+        autoSetupMerge = always
+[core]
+        editor = vim
+[grep]
+        lineNumber = true
+
+[alias]
+        root = rev-parse --show-toplevel
+        curbranch = rev-parse --abbrev-ref HEAD
+        conflicts = diff --name-only --diff-filter=U
+        resethard = reset HEAD --hard
+        stat = diff --stat
+        hash = "!h() { git rev-parse ${1:-HEAD}; }; h"
+        sha = "!h() { git rev-parse ${1:-HEAD}; }; h"
+        files = "!f() { git diff --name-status \"$1^\" \"$1\"; }; f"
+        base = "!b() { base=${1-origin/develop}; git merge-base $base HEAD; }; b"
+        contains = "!c() { if [ "0" = \"$(git merge-base --is-ancestor $1 HEAD)\" ]; then echo "true"; else echo "false"; fi; }; c"
+        cleanresethard = "!c() {pushd . > dev/null 2>&1; cd $(git rev-parse --show-toplevel); git reset HEAD --hard; git clean -fd; popd}"
