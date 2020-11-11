@@ -1,18 +1,18 @@
 [user]
-        email = bryce@domain.edu
-        name = Bryce Evans
+	email = bryce@[domain].com
+	name = Bryce Evans
 [push]
-        default = current
+	default = current
 [pull]
-        default = current
+	default = current
 [branch]
-        autoSetupPull = always
-        autoSetupPush = always
-        autoSetupMerge = always
+	autoSetupPull = always
+	autoSetupPush = always
+	autoSetupMerge = always
 [core]
-        editor = vim
+	editor = vim
 [grep]
-        lineNumber = true
+	lineNumber = true
 
 [alias]
         root = rev-parse --show-toplevel
@@ -22,7 +22,17 @@
         stat = diff --stat
         hash = "!h() { git rev-parse ${1:-HEAD}; }; h"
         sha = "!h() { git rev-parse ${1:-HEAD}; }; h"
+        default = "!d() { git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'; }; d"
+        default2 = "!d() { echo $(git default); }; d"
+        changes = "!c()  { git diff $(git merge-base HEAD $(git default)); } c"
         files = "!f() { git diff --name-status \"$1^\" \"$1\"; }; f"
         base = "!b() { base=${1-origin/develop}; git merge-base $base HEAD; }; b"
-        contains = "!c() { if [ "0" = \"$(git merge-base --is-ancestor $1 HEAD)\" ]; then echo "true"; else echo "false"; fi; }; c"
+        filesbase = "!f(){ git diff --name-status $(git merge-base origin/develop HEAD) HEAD; }; f"
+        #contains = "!c() { if [ "0" = \"$(git merge-base --is-ancestor $1 HEAD)\" ]; then echo "true"; else echo "false"; fi; }; c" 
+        contains = "!c() { if [ "0" = \"$(git log | grep $1)\" ]; then echo "true"; else echo "false"; fi; }; c" 
         cleanresethard = "!c() {pushd . > dev/null 2>&1; cd $(git rev-parse --show-toplevel); git reset HEAD --hard; git clean -fd; popd}"
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
