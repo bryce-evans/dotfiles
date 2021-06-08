@@ -119,6 +119,15 @@ fi
 
 ###################### BEGIN MY BASHRC ###############################
 
+src() {
+  source ~/.bashprofile;
+}
+
+vbp() {
+  vim ~/.bashprofile;
+  src;
+}
+
 ############### SYSTEM
 
 installdeb() {
@@ -144,8 +153,10 @@ sc() {
 disk(){
   du -h -d1 $1 | sort -n;
 }
-# 
-# docker system prune --all --force
+
+dockerprune() {
+  docker system prune --all --force;
+}
 
 # Human readable top level disk usage of files.
 diskfiles(){
@@ -322,6 +333,10 @@ vshell() {
   bcd; OTHER_VOLS="-v /home/bevans/.bashprofile:/home/cruise/.bashprofile" make shell;
 }
 
+pipeshell() {
+  bcd; OTHER_VOLS="-v /home/bevans/.bashprofile:/opt/vivarium/.bashprofile"  make pipeline-container-shell;
+}
+
 rshell() {
   tag=${1:-cyclops}
   bcd; OTHER_VOLS="-v /data/:/opt/robotorch/data -v /home/bevans/.bashprofile:/opt/robotorch/.bashprofile" make shell TAG=${tag} DOCKERFILE=project/cyclops/Dockerfile;
@@ -377,6 +392,10 @@ gitbranch() {
 }
 alias cur_branch="gitbranch";
 alias cb='printf "${GREEN}$(gitbranch)\n${NORMAL}"'
+
+gl() {
+  git --no-pager log --decorate=short --pretty="format:%C(white)commit %H%n%C(white)Author: %an <%ae>%n%C(white)Date:   %ad %C(yellow)(%ar)%n%n%C(white)%s%n" -n1;
+}
 
 gitroot() {
   git rev-parse --show-toplevel;
@@ -479,6 +498,9 @@ fd() {
   find . -type d -name "*$1*" -print 2>/dev/null
 }
 
+linecount() {
+  find . -name "*$1" | xargs wc -l
+}
 # Returns the name of the repo we are in without full path.
 # e.g. d1
 repoid() {
@@ -508,7 +530,7 @@ lint() {
 }
 
 ansible() {
-  toplevel ./setup/run_ansible.sh;
+  CRUISE_INSTALL_GRAPHICS_DRIVER=1 toplevel ./setup/run_ansible.sh
 }
 
 # Fast build a minimal set for cruisepy build
@@ -656,7 +678,7 @@ bcd_driving(){
 }
 cruise_env_cd(){
   cruise cd d${1};
-  cdrs;
+  # cdrs;
   rs;
 }
 
@@ -737,19 +759,16 @@ alias r2="bcd_robotorch 2"
 alias r3="bcd_robotorch 3"
 alias r4="bcd_robotorch 4"
 
-alias p1="bcd; cd ros/src/appearance_embedding";
-alias p2="bcd; cd ros/src/deepbox";
-alias p3="bcd; cd ros/src/emv_classification";
-alias p4="bcd; cd ros/src/vision_msgs/msg/";
-alias p5="bcd; cd ros/src/visual_fusion/";
+alias vm="bcd; cd ros/src/vision_msgs/msg/";
+alias vf="bcd; cd ros/src/visual_fusion/";
+alias mlp="bcd; cd cruise/mlp/";
+alias vd="bcd; cd cruise/mlp/projects/visual_detection/";
+alias vdd="bcd; cd cruise/mlp/projects/benchmark_datasets/visual_detection/";
+alias vdp="bcd; cd pipeline/projects/visual_detection_clm/";
+alias vs="bcd; cd ros/src/vision_stack/";
 
-alias p="p1";
-alias ae="p1";
-alias db="p2";
-alias emv="p3";
-alias vm="p4";
-alias vf="p5";
-alias cdc="bcd; cd project/cyclops";
+alias lrd="bcd; cd cruise/mlp/robotorch/project/long_range_detector";
+
 alias scopes="cd ~/galileo-scopes";
 
 ######### SEARCH
@@ -1015,25 +1034,31 @@ trigger_test_suite() {
 tl bazel run --config=python3 //ci:trigger_tests -- --branch $(cur_branch) --no-retries  --manual-authentication --test-suite $1
 }
 
-trigger_vision_all() {
+trigger_standard_tests() {
 # (this is the new MSL vision segments to check general vision metrics
 # Vision metrics
-trigger_test_suite teams/detection/blue_dragon/; 
+#trigger_test_suite teams/detection/blue_dragon/; 
 # to check e2e general metrics
 # Look at safety and comfort score
-trigger_test_suite metrics/blue_dragon/sce/valid/multi-tick; 
+#trigger_test_suite metrics/blue_dragon/sce/valid/multi-tick; 
 # Hardbrake prediction tests
-# Look at scoope for number of hardbrakes
-trigger_test_suite metrics/random_sample/01_10_20/valid
+# Look at scope for number of hardbrakes
+#trigger_test_suite metrics/random_sample/01_10_20/valid
 # End to end tests
 # Look at safety and comfort score
-trigger_test_suite metrics/feature_testing/exiting_driveway/e2e;
+#trigger_test_suite metrics/feature_testing/exiting_driveway/e2e;
 # Tracking metrics.
 # Look at Canary and old tracking metrics scope
-trigger_test_suite metrics/feature_testing/exiting_driveway/tracking_kpis;
+#trigger_test_suite metrics/feature_testing/exiting_driveway/tracking_kpis;
 # General Tracking KPI
 # Use with Tracking metrics.
-trigger_test_suite metrics/blue_dragon/tracking_kpi/batch-00/;
+#trigger_test_suite metrics/blue_dragon/tracking_kpi/batch-00/;
+
+
+trigger_test_suite teams/detection/vision_stack
+trigger_test_suite metrics/blue_dragon/sce/valid/multi-tick
+trigger_test_suite metrics/feature_testing/construction/tko_segments
+trigger_test_suite metrics/blue_dragon/tracking_kpi/
 }
 
 
@@ -1066,6 +1091,23 @@ echo "base: $base"
 echo "feature: $feature"
 google-chrome https://scopes.robot.car/scope/tracking/metrics/?obj-type=tracking&per-frame-agg=sum&per-segment-agg=sum&per-job-agg=sum&global-avg=yes&limit-labels-in-both-jobs=False&base=${base}&feature=${feature} 
 }
+
+
+export GOOGLE_CLOUD_PROJECT=cruise-mlp-prod-13d0
+
+
+## DOCKER
+# 
+# List containers
+# docker container ls
+#
+# Take container id from results and open bash
+# docker exec -t $ID bash
+
+makecyclops() {
+  tl make docker-build TAG=cyclops DOCKERFILE=project/cyclops/Dockerfile;
+}
+
 ## TEMP commands
 cyclops(){
 if [[ $1 == "build" ]]
