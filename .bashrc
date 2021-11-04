@@ -3,10 +3,10 @@
 # for examples
 
 # If not running interactively, don't do anything
-case $- in
-    *i*) ;;
-      *) return;;
-esac
+# case $- in
+#     *i*) ;;
+#       *) return;;
+# esac
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
@@ -28,7 +28,7 @@ shopt -s checkwinsize
 #shopt -s globstar
 
 # make less more friendly for non-text input files, see lesspipe(1)
-[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+# [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # set variable identifying the chroot you work in (used in the prompt below)
 if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
@@ -55,13 +55,6 @@ if [ -n "$force_color_prompt" ]; then
     color_prompt=no
     fi
 fi
-
-if [ "$color_prompt" = yes ]; then
-    PS1='\[\033[38;5;202m\]\w\[\033[00m\]\$ ' #35 is a good purple.
-else
-    PS1='\w\$ '
-fi
-unset color_prompt force_color_prompt
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
@@ -128,6 +121,31 @@ vbp() {
   src;
 }
 
+######################################################################
+# COLORS
+
+GREEN='\033[1;32m';
+BLUE='\033[1;34m';
+CYAN='\033[1;36m';
+GRAY='\033[1;30m';
+RED='\033[1;91m';
+NO_COLOR='\033[0m';
+BOLD='\033[1m';
+BLINK='\033[5m';
+NORMAL='\033[0m';
+
+parse_git_branch() {
+     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
+}
+
+if [ "$color_prompt" = yes ]; then
+    PS1='\[\033[35;5;202m\]\w\[\033[00m\]\033[00m\]\$ '
+    # PS1='\[\033[35;5;202m\]\w\[\033[00m\]\033[31m\]$(parse_git_branch)\033[00m\]\$ '
+else
+    PS1='\w\$ '
+fi
+unset color_prompt force_color_prompt
+
 ############### SYSTEM
 
 installdeb() {
@@ -164,16 +182,15 @@ diskfiles(){
 }
 
 hard-clean-force-all() {
+  # delete all the build caches and logs.
+  sudo rm -rf ~/.cache;
 
-# delete all the build caches and logs.
-sudo rm -rf ~/.cache
+  # Delete every Docker containers
+  # Must be run first because images are attached to containers
+  docker rm -f $(docker ps -a -q);
 
-# Delete every Docker containers
-# Must be run first because images are attached to containers
-docker rm -f $(docker ps -a -q)
-
-# Delete every Docker image
-docker rmi -f $(docker images -q)
+  # Delete every Docker image
+  docker rmi -f $(docker images -q);
 }
 ############### WINDOW SETUP
 
@@ -209,23 +226,12 @@ open_to_line(){
   python3 ~/scripts/open_to_line.py $1
 }
 
-######################################################################
-# COLORS
-
-GREEN='\033[1;32m';
-BLUE='\033[1;34m';
-CYAN='\033[1;36m';
-GRAY='\033[1;30m';
-RED='\033[1;91m';
-NO_COLOR='\033[0m';
-BOLD='\033[1m';
-BLINK='\033[5m';
-NORMAL='\033[0m';
 
 ######################################################################
 # OTHER CONSTANTS
 
-export VAULT_ADDR=https://vault.secure.car:8200
+# Managed repository data.
+REPO_BASE_PATH="$HOME/verily/";
 
 ######################################################################
 ### UTILTIES
@@ -455,9 +461,9 @@ alias gitprfiles='base=${1-$GIT_BRANCH_DEV}; git diff --name-only "$(git merge-b
 alias gitprfilesc='gitprfiles | wc -l';
 
 branchreset() {
-git fetch origin;
-git checkout $(basename $(gitroot));
-git reset --hard $GIT_BRANCH_TARGET;
+  git fetch origin;
+  git checkout $(basename $(gitroot));
+  git reset --hard $GIT_BRANCH_TARGET;
 }
 
 branchupdate() {
@@ -485,7 +491,7 @@ copychanges() {
 
 movechanges() {
   copychanges $1 $2;
-  echo "TODO: no move done, only copy implemented. copy complete.";
+  echo "TODO: not implemented. No move done, only copy.";
 }
 ############################# 
 # Recursively find files containing input in name.
@@ -516,27 +522,29 @@ commit_date_relative() {
 }
 
 lint() {
-  toplevel make fix;
-  printf "Confirming lint now passes...\n"
-  output=$(toplevel make lint)
-  if [[ $(echo $output | tail -1)  == *"Success"* ]]; then
-    printf "${GREEN}lint: Success!! :D ${NORMAL}\n"
-    git diff --stat;
-  else
-    printf "${RED}lint: Failure!! D: ${NORMAL}\n"
-    printf "$output\n"
-  fi
-  
+  toplevel ./scripts/cpplint.sh;
+  # printf "Confirming lint now passes...\n"
+  # output=$(toplevel make lint)
+  # if [[ $(echo $output | tail -1)  == *"Success"* ]]; then
+  #   printf "${GREEN}lint: Success!! :D ${NORMAL}\n"
+  #   git diff --stat;
+  # else
+  #   printf "${RED}lint: Failure!! D: ${NORMAL}\n"
+  #   printf "$output\n"
+  # fi
 }
 
-ansible() {
-  CRUISE_INSTALL_GRAPHICS_DRIVER=1 toplevel ./setup/run_ansible.sh
-}
 
-# Fast build a minimal set for cruisepy build
-fastbuildall() {
-tl bazel build --config=remote-only --jobs=400 $(bazel query "//... - tests(//...) - attr(tags, manual, //...)") //:dev //:devtools;
-}
+declare -A repo_data
+REPOS=()
+
+repo="surgical"
+repo_data["${repo}__name"]="surgical"
+repo_data["${repo}__prefix"]="r"
+directories=( $(seq 1 3 ) m f)
+repo_data["${repo}__ids"]=${directories[@]}
+REPOS+=(${repo})
+
 
 # For each repo, runs function with args and repo, repo_full_path
 repo_foreach() {
@@ -547,89 +555,24 @@ repo_foreach() {
   popd &> /dev/null;
   
   pushd . > /dev/null;
-  # Cruise driving repos.
-  for i in m f {1..6}; do
-    if ! `cruise cd d${i}` > /dev/null 2>&1; then
-      printf "${RED}d${i}: not found.${NO_COLOR}\n";
-      continue;
-    fi
 
-    $@;
-
+  for r in ${REPOS}; do
+    for i in ${repo_data["${r}__ids"]}; do
+      if ! cd ${REPO_BASE_PATH}${repo_data["${r}__prefix"]}${i} > /dev/null 2>&1; then
+        printf "${RED}${repo_data["${r}__prefix"]}${i}: not found.${NO_COLOR}\n";
+        continue;
+      fi
+      $@;
+    done;
+    echo " ";
   done;
  
-  echo " ";
- 
-  # Vivarium repos.
-  for i in {1..3}; do
-    if ! cd ~/${i}vivarium > /dev/null 2>&1; then
-      printf "${RED}${i}vivarium: not found.${NO_COLOR}\n";
-      continue;
-    fi
-
-    $@;
-
-  done;
-
-  popd > /dev/null 2>&1;
-}
-
-# For each repo, runs function with args and repo, repo_full_path
-repo_foreach_fast() {
-  CUR_DIR=${PWD};
-
-  pushd . &> /dev/null; bcd; 
-  CUR_REPO=${PWD##*/};
-  popd &> /dev/null;
-  
-  pushd . > /dev/null;
-  # Cruise driving repos.
-  for i in m f {1..6}; do
-    if ! cd ~/dev/d${i} > /dev/null 2>&1; then
-      printf "${RED}d${i}: not found.${NO_COLOR}\n";
-      continue;
-    fi
-    $@;
-  done;
- 
-  echo " ";
- 
-  # Vivarium repos.
-  for i in {1..3}; do
-    if ! cd ~/${i}vivarium > /dev/null 2>&1; then
-      printf "${RED}${i}vivarium: not found.${NO_COLOR}\n";
-      continue;
-    fi
-    $@;
-  done;
-
-  echo " ";
-
-  # Robotorch repos.
-  for i in {1..4}; do
-    if ! cd ~/${i}robotorch > /dev/null 2>&1; then
-      printf "${RED}${i}robotorch: not found.${NO_COLOR}\n";
-      continue;
-    fi
-    $@;
-  done;
-
-  echo " ";
- 
-  # Other repos.
-  for i in "galileo-scopes"; do
-     if ! cd ~/${i} > /dev/null 2>&1; then
-      printf "${RED}${i}: not found.${NO_COLOR}\n";
-      continue;
-    fi
-    $@;
-  done;
-
   popd > /dev/null 2>&1;
 }
 
 
 repo_status() {
+    unset repo;
     repo=${PWD##*/};
     repo_full_path=${PWD};
 
@@ -657,54 +600,19 @@ repo_status() {
 
 # Shows status of all repos (current branch and date).
 rs() {
-  repo_foreach_fast repo_status;
+  repo_foreach repo_status;
 }  
 
-# Source the workspace.
-ws() {
-  source ros/scripts/run_setup.sh;
-  tl bazel build //:_catkin_ws > /dev/null;
-  #if [[ $? == Info* ]]; then
-  #  spushd;
-  #    echo "Rebuild ROS environment needed. Building...";
-  #  spopd;
-  #fi
-}
-
-bcd_driving(){
-  cd ~/${1}cruise;
-  cdrs;
-  rs;
-}
-cruise_env_cd(){
-  cruise cd d${1};
-  # cdrs;
-  rs;
-}
-
-
-bcd_vivarium() {
-  cd ~/${1}vivarium;
-  # <set bazel root to current root>;
-  REPO=${1}vivarium;
-  rs;
-}
-
-bcd_robotorch() {
-  cd ~/${1}robotorch;
-  # <set bazel root to current root>;
-  REPO=${1}robotorch;
-  rs;
-}
+# Define a set of functions
+# <repo-prefix><repo_id> that take you to the directory location.
+for id in ${repo_surgical["dir_names"]}; do
+    eval "${repo_surgical["dir_prefix"]}${id}() { cd ${REPO_BASE_PATH}/${repo_surgical["dir_prefix"]}${id}; rs;}";
+done
 
 
 # Hack for when bazel doesn't work.
 bcd() {
   cd `gitroot`;
-}
-cdrs() {
-  bcd;
-  cd ros/src;
 }
 
 bb() {
@@ -723,53 +631,8 @@ bt() {
   fi
 }
 
-alias bcdm="cruise_env_cd m"
-alias bcdf="cruise_env_cd f"
-alias bcd1="cruise_env_cd 1"
-alias bcd2="cruise_env_cd 2"
-alias bcd3="cruise_env_cd 3"
-alias bcd4="cruise_env_cd 4"
-alias bcd5="cruise_env_cd 5"
-alias bcd6="cruise_env_cd 6"
-
-alias dm="bcdm"
-alias df="bcdf"
-alias d1="bcd1"
-alias d2="bcd2"
-alias d3="bcd3"
-alias d4="bcd4"
-alias d5="bcd5"
-alias d6="bcd6"
-# make the system df available
-alias dff="/bin/df"
-
-alias c1="bcd_driving 1"
-alias c2="bcd_driving 2"
-alias c3="bcd_driving 3"
-alias c4="bcd_driving 4"
-alias c5="bcd_driving 5"
-alias c6="bcd_driving 6"
-
-alias v1="bcd_vivarium 1"
-alias v2="bcd_vivarium 2"
-alias v3="bcd_vivarium 3"
-
-alias r1="bcd_robotorch 1"
-alias r2="bcd_robotorch 2"
-alias r3="bcd_robotorch 3"
-alias r4="bcd_robotorch 4"
-
-alias vm="bcd; cd ros/src/vision_msgs/msg/";
-alias vf="bcd; cd ros/src/visual_fusion/";
-alias mlp="bcd; cd cruise/mlp/";
-alias vd="bcd; cd cruise/mlp/projects/visual_detection/";
-alias vdd="bcd; cd cruise/mlp/projects/benchmark_datasets/visual_detection/";
-alias vdp="bcd; cd pipeline/projects/visual_detection_clm/";
-alias vs="bcd; cd ros/src/vision_stack/";
-
-alias lrd="bcd; cd cruise/mlp/robotorch/project/long_range_detector";
-
-alias scopes="cd ~/galileo-scopes";
+### specific directory shortcuts.
+alias p1="bcd; cd path/to/project/one";
 
 ######### SEARCH
 gg() {
@@ -889,7 +752,7 @@ on() {
     return 0;
   elif (( $files_found > ${cap} )); then
     array_short=${array[@]:0:$cap};
-    printf "${GREEN}${files_found} Results.${BLUE} Displaying first ${cap}${NO_COLOR}.\n"
+    printf "${GREEN}${files_found} Results.${BLUE} Displaying first ${cap}.${NO_COLOR}\n"
   fi
 
   tmp_cols=$COLUMNS;
@@ -984,117 +847,7 @@ fcd() {
   COLUMNS=$tmp_cols;
 }
 
-# run a bazel test, but pass in a filename (because that's easier to get with fzf + ctrl-t)
-bpt ()
-   {
-       # usage:
-       # bpt ros/src/perception_scenarios/smoke/tracked_and_predicted_object/all_sensors_tableflow.yaml -d /tmp/out
-      local yaml=$1;
-      local yaml_stripped=//$(echo $yaml | sed "s/\.yaml//" | sed "s/perception_scenarios\//perception_scenarios:/");
-      local other_args="${@:2}";
-      local extra_args=;
-      for arg in "${@:2}";
-      do
-          extra_args=$(echo "$extra_args $arg");
-      done;
-      echo bazel run //ros/src/perception_testing:perc -- --testsuite $yaml $extra_args;
-      bazel run //ros/src/perception_testing:perc -- --testsuite $yaml $extra_args
-  }
-
-
-##################### Cruise specific utilities
-
-## SSH into a high memory machine for retraining SMC.
-sshsmc() {
-ssh -A ubuntu@10.208.5.12
-}
-
-# List, count, and give example of tests.
-tests() {
-  if [[ $1 == "ls" ]]; then
-    tl find ros/src/perception_scenarios/$2 -name *.yaml; 
-  fi;
-  if [[ $1 == "count" ]]; then
-    tl find ros/src/perception_scenarios/$2 -name *.yaml | wc -l; 
-  fi;
-  if [[ $1 == "ex" ]]; then
-    find ros/src/perception_scenarios/$2 -name *.yaml | head -1 | xargs cat;
-  fi;
-}
-
-hydra() {
-  google-chrome https://hydra.robot.car/jobs/${1};
-}
-
-trigger_smoke() {
-   tl bazel run --config=python3 //ci:trigger_tests -- --branch $(cur_branch) --no-retries --scenario-groups smoke --manual-authentication
-}
-
-trigger_test_suite() {
-tl bazel run --config=python3 //ci:trigger_tests -- --branch $(cur_branch) --no-retries  --manual-authentication --test-suite $1
-}
-
-trigger_standard_tests() {
-# (this is the new MSL vision segments to check general vision metrics
-# Vision metrics
-#trigger_test_suite teams/detection/blue_dragon/; 
-# to check e2e general metrics
-# Look at safety and comfort score
-#trigger_test_suite metrics/blue_dragon/sce/valid/multi-tick; 
-# Hardbrake prediction tests
-# Look at scope for number of hardbrakes
-#trigger_test_suite metrics/random_sample/01_10_20/valid
-# End to end tests
-# Look at safety and comfort score
-#trigger_test_suite metrics/feature_testing/exiting_driveway/e2e;
-# Tracking metrics.
-# Look at Canary and old tracking metrics scope
-#trigger_test_suite metrics/feature_testing/exiting_driveway/tracking_kpis;
-# General Tracking KPI
-# Use with Tracking metrics.
-#trigger_test_suite metrics/blue_dragon/tracking_kpi/batch-00/;
-
-
-trigger_test_suite teams/detection/vision_stack
-trigger_test_suite metrics/blue_dragon/sce/valid/multi-tick
-trigger_test_suite metrics/feature_testing/construction/tko_segments
-trigger_test_suite metrics/blue_dragon/tracking_kpi/
-}
-
-
-trigger_single_node_tests() {
- tl ci/trigger_tests.py --branch b/artifact-regen --test-suites teams/tracking_stack/single_node/metrics/raildar_blue_dragon/test
-}
-
-trigger_replay_tests() {
-  tl ~/scripts/trigger_replay_tests.sh;
-}
-
-trigger_tracking_metrics() {
-  # tl ci/trigger_tests.py --branch $(cur_branch) --no-retries --test-suite metrics/blue_dragon/tracking_kpi/
-tl bazel run --config=python3 //ci:trigger_tests -- --branch $(cur_branch) --no-retries --test-suite metrics/blue_dragon/tracking_kpi/ --manual-authentication
-}
-
-trigger_single_test() {
-tl bazel run --config=python3 //ci:trigger_tests -- --branch $(cur_branch) --no-retries --manual-authentication --test-suite metrics/blue_dragon/tracking_kpi/batch-05/5G21A6P02L4100122_1571331480_1571331500.yaml
-}
-
-tfalseest_yaml() {
-tl bazel run //ros/src/perception_testing:perc -- -t ros/src/perception_scenarios/$@;
-}
-
-view_tracking_metrics() {
-# $1 is base, $2 is feature.
-base=$1;
-feature=$2;
-echo "base: $base"
-echo "feature: $feature"
-google-chrome https://scopes.robot.car/scope/tracking/metrics/?obj-type=tracking&per-frame-agg=sum&per-segment-agg=sum&per-job-agg=sum&global-avg=yes&limit-labels-in-both-jobs=False&base=${base}&feature=${feature} 
-}
-
-
-export GOOGLE_CLOUD_PROJECT=cruise-mlp-prod-13d0
-
+#export GOOGLE_CLOUD_PROJECT=
 
 ## DOCKER
 # 
@@ -1103,64 +856,3 @@ export GOOGLE_CLOUD_PROJECT=cruise-mlp-prod-13d0
 #
 # Take container id from results and open bash
 # docker exec -t $ID bash
-
-makecyclops() {
-  tl make docker-build TAG=cyclops DOCKERFILE=project/cyclops/Dockerfile;
-}
-
-## TEMP commands
-cyclops(){
-if [[ $1 == "build" ]]
-then
-  tl cp ~/.bashprofile .
-  tl make docker-build TAG=cyclops DOCKERFILE=project/cyclops/Dockerfile;
-elif [[ $1 == "train" ]]
-then
-    flags=""
-    if [ $# -eq 2 ]
-      then
-      flags="--weights-path=${2}"
-      printf "Loaded ${2}"
-    fi
-    tl python -m project.cyclops.run train --config project/cyclops/config.jen --job-dir experiments/cyclops --max-training-steps=10000 $flags;
-elif [[ $1 == "train_distributed" ]]
-then
-    tl python -m torch.distributed.launch --nproc_per_node=2 -m project.cyclops.run train --config project/cyclops/config.jen --job-dir experiments/ --max-training-steps 1000
-elif [[ $1 == "debug" ]]
-then
-    tl python -m project.cyclops.run train --config project/cyclops/debug_config.jen --job-dir experiments/cyclops --max-training-steps=1000;
-elif [[ $1 == "profile" ]]
-then
-    tl python -m cProfile -o cprofile_results.prof project/cyclops/run.py train --config project/cyclops/debug_config.jen --job-dir experiments/cyclops --max-training-steps=10;
-elif [[ $1 == "viz" ]]
-then
-    tl python -m project.cyclops.run visualize_data --config project/cyclops/config.jen --job-dir project/cyclops/visualize_data;
-elif [[ $1 == "eval" ]]
-then
-    tl python -m project.cyclops.run eval --config project/cyclops/config.jen --job-dir experiments/cyclops_eval --checkpoint $2;
-else
-    echo "usage: cylops [train | train_distributed | eval | profile | viz]"
-fi
-}
-#cyclops() {
-#complete -W "train viz" cyclops
-#}
-
-
-cyclops_eval() {
-  jobid=$1
-  if [ $# -eq 2 ]
-  then 
-    userid=$2
-  else
-    userid="bryce.evans"
-  fi
-  cdc;
-  cmd="flow submit --job-id eval__${jobid} eval --checkpoint gs://vivarium-ml-jobs/${userid}/perception/cyclops/${jobid}/checkpoint_latest.ckpt"
-  echo $cmd;
-  $cmd;
-}
-
-latest_ckpt() {
-echo "gs://vivarium-ml-jobs/bryce.evans/perception/cyclops/${1}/checkpoint_latest.ckpt";
-}
