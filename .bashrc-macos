@@ -1,0 +1,2 @@
+# Allow downloads from anywhere
+# sudo spctl --master-disable
